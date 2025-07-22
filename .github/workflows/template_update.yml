@@ -59,7 +59,11 @@ jobs:
       - name: Read old template SHA
         id: get_old_sha
         run: |
-          OLD_SHA=$(jq -r '.template_sha' .cookiecutter.json)
+          OLD_SHA=$(jq -r '.template_sha // empty' .cookiecutter.json)
+          if [ -z "$OLD_SHA" ]; then
+            echo "::error ::.cookiecutter.json is missing 'template_sha'"
+            exit 1
+          fi
           echo "old_sha=$OLD_SHA" >> $GITHUB_OUTPUT
       - name: Fetch new template SHA
         id: get_new_sha
