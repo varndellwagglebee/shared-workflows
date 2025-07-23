@@ -129,6 +129,11 @@ jobs:
       - name: Cleanup
         run: rm -rf base-template template-source template-base template-new update.patch
 
+      - name: Configure Git author
+        run: |
+          git config user.name  "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          
       - name: Commit & push
         id: commit
         run: |
