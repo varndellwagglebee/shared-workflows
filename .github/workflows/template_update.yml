@@ -99,7 +99,7 @@ jobs:
         run: |
           mkdir -p template-base
           cookiecutter "base-template/${{ steps.template_path.outputs.path }}" \
-            --no-input --replay-file .cookiecutter.json \
+            --replay-file .cookiecutter.json \
             --output-dir template-base
 
       - name: Generate new template output
