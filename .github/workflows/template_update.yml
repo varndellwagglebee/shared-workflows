@@ -83,24 +83,27 @@ jobs:
       - name: Generate base template output
         run: |
           mkdir -p template-base
+          # load the JSON into a shell var
+          EXTRA_CONTEXT="$(<context.json)"
           cookiecutter "${{ inputs.template_repo }}" \
-          --checkout HEAD \
-          --directory "${{ steps.template_path.outputs.path }}" \
-          --no-input \
-          --overwrite-if-exists \
-          --extra-context context.json \
-          --output-dir template-base
+            --checkout HEAD \
+            --directory "${{ steps.template_path.outputs.path }}" \
+            --no-input \
+            --overwrite-if-exists \
+            --extra-context "$EXTRA_CONTEXT" \
+            --output-dir template-base
 
       - name: Generate new template output
         run: |
           mkdir -p template-new
+          EXTRA_CONTEXT="$(<context.json)"
           cookiecutter "${{ inputs.template_repo }}" \
-          --checkout HEAD \
-          --directory "${{ steps.template_path.outputs.path }}" \
-          --no-input \
-          --overwrite-if-exists \
-          --extra-context context.json \
-          --output-dir template-new
+            --checkout HEAD \
+            --directory "${{ steps.template_path.outputs.path }}" \
+            --no-input \
+            --overwrite-if-exists \
+            --extra-context "$EXTRA_CONTEXT" \
+            --output-dir template-new
 
       - name: Create update.patch
         run: |
