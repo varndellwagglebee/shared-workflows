@@ -31,6 +31,11 @@ jobs:
       - name: Install dependencies
         run: pip install cookiecutter jq
 
+      - name: Extract saved context
+        run: |
+          jq -c '.cookiecutter' .cookiecutter.json > context.json
+
+       # pull out just the `cookiecutter` object
       - name: Read old template SHA
         id: get_old_sha
         run: |
@@ -79,21 +84,23 @@ jobs:
         run: |
           mkdir -p template-base
           cookiecutter "${{ inputs.template_repo }}" \
-            --checkout HEAD \
-            --directory "${{ steps.template_path.outputs.path }}" \
-            --replay-file .cookiecutter.json \
-            --output-dir template-base
+          --checkout HEAD \
+          --directory "${{ steps.template_path.outputs.path }}" \
+          --no-input \
+          --overwrite-if-exists \
+          --extra-context context.json \
+          --output-dir template-base
 
       - name: Generate new template output
         run: |
           mkdir -p template-new
           cookiecutter "${{ inputs.template_repo }}" \
-            --checkout HEAD \
-            --directory "${{ steps.template_path.outputs.path }}" \
-            --replay-file .cookiecutter.json \
-            --no-input \
-            --overwrite-if-exists \
-            --output-dir template-new
+          --checkout HEAD \
+          --directory "${{ steps.template_path.outputs.path }}" \
+          --no-input \
+          --overwrite-if-exists \
+          --extra-context context.json \
+          --output-dir template-new
 
       - name: Create update.patch
         run: |
