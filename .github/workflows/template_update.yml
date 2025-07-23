@@ -83,14 +83,12 @@ jobs:
       - name: Generate base template output
         run: |
           mkdir -p template-base
-          # load the JSON into a shell var
-          EXTRA_CONTEXT="$(<context.json)"
           cookiecutter "${{ inputs.template_repo }}" \
             --checkout HEAD \
             --directory "${{ steps.template_path.outputs.path }}" \
-            --no-input \
+            --replay-file .cookiecutter.json \
+            --no-cache \
             --overwrite-if-exists \
-            --extra-context "$EXTRA_CONTEXT" \
             --output-dir template-base
 
       - name: Generate new template output
