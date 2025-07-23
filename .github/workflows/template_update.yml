@@ -79,7 +79,10 @@ jobs:
           else
             echo "::error ::No valid sub-template selected!" && exit 1
           fi
-
+      
+      - name: Clear Cookiecutter cache
+        run: rm -rf ~/.cookiecutters/*project.cookiecutter*
+        
       - name: Generate base template output
         run: |
           mkdir -p template-base
