@@ -115,13 +115,6 @@ jobs:
 
       - name: Apply three-way merge
         run: |
-          if ! git apply --index --3way update.patch; then
-            echo "::error ::Merge conflicts detected in template updates – exiting."
-            exit 1
-          fi
-
-      - name: Apply three-way merge
-        run: |
           # if the patch file is empty, skip the merge
           if [ ! -s update.patch ]; then
             echo "No template changes detected; skipping merge."
