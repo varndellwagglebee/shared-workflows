@@ -36,10 +36,10 @@ jobs:
             exit 1
           fi
 
-      - name: Trigger update-template workflow
+      - name: Trigger template-update workflow
         uses: benc-uk/workflow-dispatch@v1
         with:
-          workflow: update_template.yml
+          workflow: template-update.yml
           repo: ${{ github.repository }}
           ref: ${{ inputs.update_workflow_ref }}
           inputs: |
