@@ -1,4 +1,4 @@
-name: validate_inputs
+name: validate_template_inputs
 
 on:
   workflow_call:
