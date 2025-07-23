@@ -91,6 +91,7 @@ jobs:
             --checkout HEAD \
             --directory "${{ steps.template_path.outputs.path }}" \
             --replay-file .cookiecutter.json \
+            --no-input \
             --overwrite-if-exists \
             --output-dir template-new
 
