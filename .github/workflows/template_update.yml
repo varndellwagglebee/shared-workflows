@@ -54,6 +54,13 @@ jobs:
             git checkout "${{ steps.get_old_sha.outputs.old_sha }}"
           popd
 
+      - name: Verify .git exists in base-template
+        run: |
+          if [ ! -d base-template/.git ]; then
+            echo "::error ::base-template is missing .git directory!"
+            exit 1
+          fi
+          
       - name: Clone new template at HEAD
         run: git clone "${{ inputs.template_repo }}" template-source
 
@@ -71,14 +78,16 @@ jobs:
       - name: Generate base template output
         run: |
           mkdir -p template-base
-          cookiecutter "base-template/${{ steps.template_path.outputs.path }}" \
+          cookiecutter base-template \
+            --directory "${{ steps.template_path.outputs.path }}" \
             --replay-file .cookiecutter.json \
             --output-dir template-base
 
       - name: Generate new template output
         run: |
           mkdir -p template-new
-          cookiecutter "template-source/${{ steps.template_path.outputs.path }}" \
+          cookiecutter template-source \
+            --directory "${{ steps.template_path.outputs.path }}" \
             --replay-file .cookiecutter.json \
             --output-dir template-new
 
