@@ -35,13 +35,10 @@ jobs:
             echo "::error ::Branch '${{ inputs.repo_branch }}' not found!"
             exit 1
           fi
-
-      - name: Trigger template-update workflow
-        uses: benc-uk/workflow-dispatch@v1
-        with:
-          workflow: template-update.yml
-          repo: ${{ github.repository }}
-          ref: ${{ inputs.update_workflow_ref }}
-          inputs: |
-            template_repo: ${{ inputs.template_repo }}
-            repo_branch: ${{ inputs.repo_branch }}
+          
+  dispatch-update:
+    needs: validate
+    uses: ./.github/workflows/template_update.yml
+    with:
+      template_repo: ${{ inputs.template_repo }}
+      repo_branch: ${{ inputs.repo_branch }}
