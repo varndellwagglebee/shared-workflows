@@ -1,17 +1,6 @@
 name: template_update
 
 on:
- workflow_dispatch:
-    inputs:
-      template_repo:
-        description: 'URL of the cookiecutter template repo'
-        required: true
-        type: string
-      repo_branch:
-        description: 'Branch of the project repo to update'
-        required: true
-        type: string
-
  workflow_call:
     inputs:
       template_repo:
