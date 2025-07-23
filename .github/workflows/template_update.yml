@@ -79,6 +79,7 @@ jobs:
         run: |
           mkdir -p template-base
           cookiecutter "${{ inputs.template_repo }}" \
+            --checkout HEAD \
             --directory "${{ steps.template_path.outputs.path }}" \
             --replay-file .cookiecutter.json \
             --output-dir template-base
@@ -87,6 +88,7 @@ jobs:
         run: |
           mkdir -p template-new
           cookiecutter "${{ inputs.template_repo }}" \
+            --checkout HEAD \
             --directory "${{ steps.template_path.outputs.path }}" \
             --replay-file .cookiecutter.json \
             --output-dir template-new
