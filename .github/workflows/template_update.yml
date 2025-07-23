@@ -82,7 +82,7 @@ jobs:
       
       - name: Clear Cookiecutter cache
         run: rm -rf ~/.cookiecutters/*project.cookiecutter*
-        
+
       - name: Generate base template output
         run: |
           mkdir -p template-base
@@ -90,23 +90,20 @@ jobs:
             --checkout HEAD \
             --directory "${{ steps.template_path.outputs.path }}" \
             --replay-file .cookiecutter.json \
-            --no-cache \
             --overwrite-if-exists \
             --output-dir template-base
 
       - name: Clear Cookiecutter cache
         run: rm -rf ~/.cookiecutters/*project.cookiecutter*
-        
+
       - name: Generate new template output
         run: |
           mkdir -p template-new
-          EXTRA_CONTEXT="$(<context.json)"
           cookiecutter "${{ inputs.template_repo }}" \
             --checkout HEAD \
             --directory "${{ steps.template_path.outputs.path }}" \
-            --no-input \
+            --replay-file .cookiecutter.json \
             --overwrite-if-exists \
-            --extra-context "$EXTRA_CONTEXT" \
             --output-dir template-new
 
       - name: Create update.patch
