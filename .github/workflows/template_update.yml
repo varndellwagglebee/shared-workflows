@@ -120,12 +120,18 @@ jobs:
             exit 1
           fi
 
-      - name: Write new SHA to .cookiecutter.json
+      - name: Apply three-way merge
         run: |
-          jq --arg sha "${{ steps.get_new_sha.outputs.new_sha }}" \
-             '.cookiecutter.template_sha = $sha' .cookiecutter.json > tmp.json
-          mv tmp.json .cookiecutter.json
-          git add .cookiecutter.json
+          # if the patch file is empty, skip the merge
+          if [ ! -s update.patch ]; then
+            echo "No template changes detected; skipping merge."
+          else
+            # otherwise attempt a 3-way apply and fail on conflicts
+            if ! git apply --index --3way update.patch; then
+              echo "::error ::Merge conflicts detected in template updates – exiting."
+              exit 1
+            fi
+          fi
 
       - name: Cleanup
         run: rm -rf base-template template-source template-base template-new update.patch
