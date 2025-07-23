@@ -100,15 +100,9 @@ jobs:
           mkdir -p template-base
           cookiecutter "base-template/${{ steps.template_path.outputs.path }}" \
             --replay-file .cookiecutter.json \
+            --extra-context "$(jq -c '.cookiecutter' .cookiecutter.json)" \
             --output-dir template-base
-
-      - name: Generate new template output
-        run: |
-          mkdir -p template-new
-          cookiecutter "template-source/${{ steps.template_path.outputs.path }}" \
-            --replay-file .cookiecutter.json \
-            --output-dir template-new
-
+            
       # 7. Create a unified patch
       - name: Create update.patch
         run: |
