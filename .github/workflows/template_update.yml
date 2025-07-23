@@ -94,6 +94,9 @@ jobs:
             --overwrite-if-exists \
             --output-dir template-base
 
+      - name: Clear Cookiecutter cache
+        run: rm -rf ~/.cookiecutters/*project.cookiecutter*
+        
       - name: Generate new template output
         run: |
           mkdir -p template-new
