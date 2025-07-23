@@ -129,29 +129,26 @@ jobs:
       - name: Cleanup
         run: rm -rf base-template template-source template-base template-new update.patch
 
+      - name: Remove temporary context file
+        run: rm -f context.json
+
       - name: Configure Git author
         run: |
           git config user.name  "GitHub Actions Bot"
           git config user.email "actions@github.com"
-          
-      - name: Commit & push
+
+      - name: Commit & push only if changes
         id: commit
+        shell: bash
         run: |
+          # if nothing is staged, skip
+          if git diff --cached --quiet; then
+            echo "No template updates to commit; skipping."
+            exit 0
+          fi
+
           BRANCH="template-update-${{ steps.get_new_sha.outputs.new_sha }}"
           echo "UPDATE_BRANCH=$BRANCH" >> $GITHUB_ENV
           git checkout -b "$BRANCH"
           git commit -m "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}"
           git push origin "$BRANCH"
-
-      - name: Create draft Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ env.UPDATE_BRANCH }}
-          base:   ${{ inputs.repo_branch }}
-          draft:  true
-          title:  "chore: merge cookiecutter template updates"
-          body: |
-            **Template Repo:** ${{ inputs.template_repo }}
-            **Base SHA:**      ${{ steps.get_old_sha.outputs.old_sha }}
-            **New  SHA:**      ${{ steps.get_new_sha.outputs.new_sha }}
