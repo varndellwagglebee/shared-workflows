@@ -2,6 +2,7 @@ name: template_update
 
 permissions:
   contents: write
+  pull-requests: write
 
 on:
   workflow_call:
