@@ -152,18 +152,18 @@ jobs:
       - name: Cleanup temporary files
         run: rm -rf base-template template-source template-base template-new update.patch
 
-      # 13. Commit & push only if there are staged changes
+      # 13. Commit only if there are staged changes
       - name: Configure Git author
         run: |
           git config user.name  "GitHub Actions Bot"
           git config user.email "actions@github.com"
 
-      - name: Commit & push only if changes
+      - name: Commit & pull request branch if changes
         id: commit
         shell: bash
         run: |
           if git diff --cached --quiet; then
-            echo "No changes to commit; skipping."
+            echo "No changes to commit; skipping branch creation."
             exit 0
           fi
           BRANCH="template-update-${{ steps.get_new_sha.outputs.new_sha }}"
@@ -171,3 +171,16 @@ jobs:
           git checkout -b "$BRANCH"
           git commit -m "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}"
           git push origin "$BRANCH"
+      
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          base: ${{ inputs.repo_branch }}
+          branch: ${{ env.UPDATE_BRANCH }}
+          title: "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}"
+          body: |
+            Merges cookiecutter template updates from
+            ${{ steps.get_old_sha.outputs.old_sha }} to
+            ${{ steps.get_new_sha.outputs.new_sha }}.
+          labels: template-update
