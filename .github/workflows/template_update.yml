@@ -1,5 +1,8 @@
 name: template_update
 
+permissions:
+  contents: write
+  
 on:
  workflow_call:
     inputs:
@@ -11,9 +14,6 @@ on:
         description: 'Branch of the project repo to update'
         required: true
         type: string
-		
-permissions:
-  contents: write
 
 jobs:
   template-update:
