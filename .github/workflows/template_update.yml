@@ -178,6 +178,15 @@ jobs:
           git diff --cached --quiet || git commit -m "chore: bump template_sha to ${{ steps.get_new_sha.outputs.new_sha }}"
           git push origin "${UPDATE_BRANCH}"
 
+      - name: "Debug: show branch, last commit & file"
+        if: env.SHA_CHANGED == 'true'
+        run: |
+          echo "On branch: $(git rev-parse --abbrev-ref HEAD)"
+          git log -1 --oneline
+          echo "--- .cookiecutter.json ---"
+          cat .cookiecutter.json
+          echo "--------------------------"
+
       # 18. Create Pull Request
       - name: Create Pull Request
         if: env.SHA_CHANGED == 'true'
