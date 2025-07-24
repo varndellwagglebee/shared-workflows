@@ -1,7 +1,7 @@
 name: template_update
 
 on:
- workflow_call:
+  workflow_call:
     inputs:
       template_repo:
         description: 'URL of the cookiecutter template repo'
@@ -15,14 +15,9 @@ on:
 jobs:
   template-update:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout project repo
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ inputs.repo_branch }}
 
+      # 1. Install Python & deps
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -31,10 +26,14 @@ jobs:
       - name: Install dependencies
         run: pip install cookiecutter jq
 
-      - name: Extract saved context
-        run: |
-          jq -c '.cookiecutter' .cookiecutter.json > context.json
+      # 2. Checkout the project
+      - name: Checkout project repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.repo_branch }}
 
+      # 3. Read OLD SHA from the nested object
       - name: Read old template SHA
         id: get_old_sha
         run: |
@@ -45,105 +44,112 @@ jobs:
           fi
           echo "old_sha=$OLD_SHA" >> $GITHUB_OUTPUT
 
+      # 4. Fetch latest template SHA
       - name: Fetch new template SHA
         id: get_new_sha
         run: |
           NEW_SHA=$(git ls-remote "${{ inputs.template_repo }}" HEAD | cut -f1)
           echo "new_sha=$NEW_SHA" >> $GITHUB_OUTPUT
 
+      # 5. Exit early if template hasn’t changed
       - name: Skip if template unchanged
         run: |
           if [ "${{ steps.get_old_sha.outputs.old_sha }}" = "${{ steps.get_new_sha.outputs.new_sha }}" ]; then
             echo "Template SHA unchanged (${{ steps.get_old_sha.outputs.old_sha }}); exiting."
             exit 0
           fi
-          echo "Template changed"
+          echo "Template has changed → proceeding with update"
 
-      - name: Clone base template at old SHA
+      # 6. Clone both versions of the template
+      - name: Clone base template at OLD SHA
         run: |
           git clone "${{ inputs.template_repo }}" base-template
           pushd base-template
             git checkout "${{ steps.get_old_sha.outputs.old_sha }}"
           popd
-            echo "Cloned base Template based on SHA"
+          echo "✅ Cloned base template @ ${{ steps.get_old_sha.outputs.old_sha }}"
 
-      - name: Verify .git exists in base-template
+      - name: Clone new template at HEAD
         run: |
-          if [ ! -d base-template/.git ]; then
-            echo "::error ::base-template is missing .git directory!"
+          git clone "${{ inputs.template_repo }}" template-source
+          echo "✅ Cloned new template @ ${{ steps.get_new_sha.outputs.new_sha }}"
+
+      # 7. Determine sub-template path BEFORE rendering
+      - name: Determine sub-template path
+        id: template_path
+        run: |
+          ASP=$(jq -r '.cookiecutter.is_aspire // "no"' .cookiecutter.json)
+          DOC=$(jq -r '.cookiecutter.is_docker // "no"' .cookiecutter.json)
+          if [ "$ASP" = "yes" ]; then
+            echo "path=aspire-project" >> $GITHUB_OUTPUT
+          elif [ "$DOC" = "yes" ]; then
+            echo "path=docker-project" >> $GITHUB_OUTPUT
+          else
+            echo "::error ::Neither is_aspire nor is_docker is set to yes in .cookiecutter.json"
             exit 1
           fi
-          echo ".git exits"
-          
-      - name: Clone new template at HEAD
-        run: git clone "${{ inputs.template_repo }}" template-source
-         echo "Cloning new template"
-         
-      - name: Generate base template output
+
+      # 8a. Render OLD template
+      - name: Generate base (old) template output
         run: |
           rm -rf ~/.cookiecutters/*project.cookiecutter*
           mkdir -p template-base
           cookiecutter "${{ inputs.template_repo }}" \
-            --checkout HEAD \
+            --checkout "${{ steps.get_old_sha.outputs.old_sha }}" \
             --directory "${{ steps.template_path.outputs.path }}" \
             --replay-file .cookiecutter.json \
             --overwrite-if-exists \
             --output-dir template-base
 
+      # 8b. Render NEW template
       - name: Generate new template output
         run: |
           rm -rf ~/.cookiecutters/*project.cookiecutter*
           mkdir -p template-new
           cookiecutter "${{ inputs.template_repo }}" \
-            --checkout HEAD \
+            --checkout "${{ steps.get_new_sha.outputs.new_sha }}" \
             --directory "${{ steps.template_path.outputs.path }}" \
             --replay-file .cookiecutter.json \
             --overwrite-if-exists \
             --output-dir template-new
 
+      # 9. Build a unified diff
       - name: Create update.patch
         run: |
           diff -ruN \
             template-base/${{ steps.template_path.outputs.path }} \
             template-new/${{ steps.template_path.outputs.path }} \
             > update.patch || true
-          echo "Created Update patch"
-            
-      - name: Determine sub-template path
-        id: template_path
-        run: |
-          if grep -q '"is_aspire": *"yes"' .cookiecutter.json; then
-            echo "path=aspire-project" >> $GITHUB_OUTPUT
-          elif grep -q '"is_docker": *"yes"' .cookiecutter.json; then
-            echo "path=docker-project" >> $GITHUB_OUTPUT
-          else
-            echo "::error ::No valid sub-template selected!" && exit 1
-          fi
+          echo "✅ update.patch created"
 
+      # 10. Apply it as a three‑way merge
       - name: Apply three-way merge
+        id: apply_patch
         run: |
-          # if the patch file is empty, skip the merge
           if [ ! -s update.patch ]; then
             echo "No template changes detected; skipping merge."
           else
-            # otherwise attempt a 3-way apply and fail on conflicts
             if ! git apply --index --3way update.patch; then
-              echo "::error ::Merge conflicts detected in template updates – exiting."
+              echo "::error ::Merge conflicts detected; aborting."
               exit 1
             fi
+            echo "✅ Applied template changes"
           fi
-          
-      # 11. Update the saved SHA in the nested object
+
+      # 11. Update the saved SHA in .cookiecutter.json
       - name: Update saved template SHA
         if: steps.apply_patch.conclusion == 'success'
         run: |
           jq ".cookiecutter.template_sha = \"${{ steps.get_new_sha.outputs.new_sha }}\"" \
             .cookiecutter.json > tmp.json && mv tmp.json .cookiecutter.json
           git add .cookiecutter.json
+          echo "✅ Bumped template_sha to ${{ steps.get_new_sha.outputs.new_sha }}"
 
+      # 12. Cleanup temp dirs
       - name: Cleanup temporary files
         run: rm -rf base-template template-source template-base template-new update.patch
 
+      # 13. Commit & push only if there are staged changes
       - name: Configure Git author
         run: |
           git config user.name  "GitHub Actions Bot"
@@ -153,12 +159,10 @@ jobs:
         id: commit
         shell: bash
         run: |
-          # if nothing is staged, skip
           if git diff --cached --quiet; then
-            echo "No template updates to commit; skipping."
+            echo "No changes to commit; skipping."
             exit 0
           fi
-
           BRANCH="template-update-${{ steps.get_new_sha.outputs.new_sha }}"
           echo "UPDATE_BRANCH=$BRANCH" >> $GITHUB_ENV
           git checkout -b "$BRANCH"
