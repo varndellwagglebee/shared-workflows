@@ -141,7 +141,7 @@ jobs:
 
       # 11. Update the saved SHA in .cookiecutter.json
       - name: Update saved template SHA
-        if: steps.apply_patch.conclusion == 'success'
+        if: steps.get_new_sha.outputs.new_sha != steps.get_old_sha.outputs.old_sha
         run: |
           jq ".cookiecutter.template_sha = \"${{ steps.get_new_sha.outputs.new_sha }}\"" \
             .cookiecutter.json > tmp.json && mv tmp.json .cookiecutter.json
