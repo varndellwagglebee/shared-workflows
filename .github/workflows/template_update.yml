@@ -124,24 +124,23 @@ jobs:
             template-new/${{ steps.template_path.outputs.path }} \
             > update.patch || true
           echo "✅ update.patch created"
-
-      # 10. Apply it as a three‑way merge
+               
+      # 10. Exit if no changes, else apply patch and abort on conflicts
       - name: Apply three-way merge
         id: apply_patch
         run: |
           if [ ! -s update.patch ]; then
-            echo "No template changes detected; skipping merge."
-          else
-            if ! git apply --index --3way update.patch; then
-              echo "::error ::Merge conflicts detected; aborting."
-              exit 1
-            fi
-            echo "✅ Applied template changes"
+            echo "No template changes detected; exiting."
+            exit 0
           fi
+          if ! git apply --index --3way update.patch; then
+            echo "::error ::Merge conflicts detected; aborting."
+            exit 1
+          fi
+          echo "✅ Applied template changes"
 
-      # 11. Update the saved SHA in .cookiecutter.json
+      # 11. Bump template_sha in .cookiecutter.json
       - name: Update saved template SHA
-        if: steps.get_new_sha.outputs.new_sha != steps.get_old_sha.outputs.old_sha
         run: |
           jq ".cookiecutter.template_sha = \"${{ steps.get_new_sha.outputs.new_sha }}\"" \
             .cookiecutter.json > tmp.json && mv tmp.json .cookiecutter.json
@@ -158,7 +157,7 @@ jobs:
           git config user.name  "GitHub Actions Bot"
           git config user.email "actions@github.com"
 
-      - name: Commit & pull request branch if changes
+      - name: Commit & pull branch
         id: commit
         shell: bash
         run: |
