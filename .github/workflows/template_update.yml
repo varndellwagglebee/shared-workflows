@@ -35,7 +35,6 @@ jobs:
         run: |
           jq -c '.cookiecutter' .cookiecutter.json > context.json
 
-       # pull out just the `cookiecutter` object
       - name: Read old template SHA
         id: get_old_sha
         run: |
@@ -52,13 +51,13 @@ jobs:
           NEW_SHA=$(git ls-remote "${{ inputs.template_repo }}" HEAD | cut -f1)
           echo "new_sha=$NEW_SHA" >> $GITHUB_OUTPUT
 
-      # 5. Exit early if unchanged
       - name: Skip if template unchanged
         run: |
           if [ "${{ steps.get_old_sha.outputs.old_sha }}" = "${{ steps.get_new_sha.outputs.new_sha }}" ]; then
             echo "Template SHA unchanged (${{ steps.get_old_sha.outputs.old_sha }}); exiting."
             exit 0
           fi
+          echo "Template changed"
 
       - name: Clone base template at old SHA
         run: |
@@ -66,6 +65,7 @@ jobs:
           pushd base-template
             git checkout "${{ steps.get_old_sha.outputs.old_sha }}"
           popd
+            echo "Cloned base Template based on SHA"
 
       - name: Verify .git exists in base-template
         run: |
@@ -73,21 +73,12 @@ jobs:
             echo "::error ::base-template is missing .git directory!"
             exit 1
           fi
+          echo ".git exits"
           
       - name: Clone new template at HEAD
         run: git clone "${{ inputs.template_repo }}" template-source
-
-      - name: Determine sub-template path
-        id: template_path
-        run: |
-          if grep -q '"is_aspire": *"yes"' .cookiecutter.json; then
-            echo "path=aspire-project" >> $GITHUB_OUTPUT
-          elif grep -q '"is_docker": *"yes"' .cookiecutter.json; then
-            echo "path=docker-project" >> $GITHUB_OUTPUT
-          else
-            echo "::error ::No valid sub-template selected!" && exit 1
-          fi
-
+         echo "Cloning new template"
+         
       - name: Generate base template output
         run: |
           rm -rf ~/.cookiecutters/*project.cookiecutter*
@@ -116,6 +107,18 @@ jobs:
             template-base/${{ steps.template_path.outputs.path }} \
             template-new/${{ steps.template_path.outputs.path }} \
             > update.patch || true
+          echo "Created Update patch"
+            
+      - name: Determine sub-template path
+        id: template_path
+        run: |
+          if grep -q '"is_aspire": *"yes"' .cookiecutter.json; then
+            echo "path=aspire-project" >> $GITHUB_OUTPUT
+          elif grep -q '"is_docker": *"yes"' .cookiecutter.json; then
+            echo "path=docker-project" >> $GITHUB_OUTPUT
+          else
+            echo "::error ::No valid sub-template selected!" && exit 1
+          fi
 
       - name: Apply three-way merge
         run: |
