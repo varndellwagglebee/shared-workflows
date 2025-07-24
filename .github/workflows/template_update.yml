@@ -18,16 +18,14 @@ on:
 jobs:
   template-update:
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Checkout the target branch (full history, able to push)
+      # 1. Checkout target branch (full history, can push)
       - name: Checkout project repo
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
+          repository: ${{ github.repository }}
           ref: ${{ inputs.repo_branch }}
-          persist-credentials: true
+          fetch-depth: 0
 
       # 2. Set up Python & install deps
       - name: Set up Python
@@ -37,7 +35,7 @@ jobs:
       - name: Install dependencies
         run: pip install cookiecutter jq
 
-      # 3. Read old template SHA
+      # 3. Read old SHA
       - name: Read old template SHA
         id: get_old_sha
         run: |
@@ -48,34 +46,46 @@ jobs:
           fi
           echo "old_sha=$OLD_SHA" >> $GITHUB_OUTPUT
 
-      # 4. Fetch new template SHA
+      # 4. Fetch new SHA
       - name: Fetch new template SHA
         id: get_new_sha
         run: |
           NEW_SHA=$(git ls-remote "${{ inputs.template_repo }}" HEAD | cut -f1)
           echo "new_sha=$NEW_SHA" >> $GITHUB_OUTPUT
 
-      # 5. Exit if unchanged
-      - name: Skip if template unchanged
+      # 5. Determine if SHA changed
+      - name: Determine if SHA changed
+        id: sha_check
         run: |
-          if [ "${{ steps.get_old_sha.outputs.old_sha }}" = "${{ steps.get_new_sha.outputs.new_sha }}" ]; then
-            echo "Template SHA unchanged; exiting."
-            exit 0
+          if [ "${{ steps.get_old_sha.outputs.old_sha }}" != "${{ steps.get_new_sha.outputs.new_sha }}" ]; then
+            echo "SHA_CHANGED=true" >> $GITHUB_ENV
+          else
+            echo "SHA_CHANGED=false" >> $GITHUB_ENV
           fi
 
-      # 6. Clone both template versions
+      # 6. Exit early if SHA unchanged
+      - name: Exit if SHA unchanged
+        if: env.SHA_CHANGED == 'false'
+        run: |
+          echo "✂️ SHA unchanged; nothing to update."
+          exit 0
+
+      # 7. Clone both template versions
       - name: Clone base template at OLD SHA
+        if: env.SHA_CHANGED == 'true'
         run: |
           git clone "${{ inputs.template_repo }}" base-template
           pushd base-template
             git checkout "${{ steps.get_old_sha.outputs.old_sha }}"
           popd
       - name: Clone new template at HEAD
+        if: env.SHA_CHANGED == 'true'
         run: git clone "${{ inputs.template_repo }}" template-source
 
-      # 7. Determine sub-template path
+      # 8. Determine sub-template path
       - name: Determine sub-template path
         id: template_path
+        if: env.SHA_CHANGED == 'true'
         run: |
           ASP=$(jq -r '.cookiecutter.is_aspire // "no"' .cookiecutter.json)
           DOC=$(jq -r '.cookiecutter.is_docker // "no"' .cookiecutter.json)
@@ -87,8 +97,9 @@ jobs:
             echo "::error ::No valid sub-template in .cookiecutter.json" && exit 1
           fi
 
-      # 8a. Render base (old) template
+      # 9. Render base (old) template output
       - name: Generate base template output
+        if: env.SHA_CHANGED == 'true'
         run: |
           rm -rf ~/.cookiecutters/*
           mkdir -p template-base
@@ -98,8 +109,9 @@ jobs:
             --overwrite-if-exists \
             --output-dir template-base
 
-      # 8b. Render new template
+      # 10. Render new template output
       - name: Generate new template output
+        if: env.SHA_CHANGED == 'true'
         run: |
           rm -rf ~/.cookiecutters/*
           mkdir -p template-new
@@ -109,73 +121,72 @@ jobs:
             --overwrite-if-exists \
             --output-dir template-new
 
-      # 9. Create unified diff
+      # 11. Create unified diff
       - name: Create update.patch
+        if: env.SHA_CHANGED == 'true'
         run: |
           diff -ruN \
             template-base/${{ steps.template_path.outputs.path }} \
             template-new/${{ steps.template_path.outputs.path }} \
             > update.patch || true
 
-      # 10. Apply patch (exit on conflicts)
+      # 12. Apply patch (abort on conflicts)
       - name: Apply patch if changes
-        id: apply_patch
+        if: env.SHA_CHANGED == 'true'
         run: |
-          if [ ! -s update.patch ]; then
-            echo "No template changes detected; exiting."
-            exit 0
-          fi
-          if ! git apply --index --3way update.patch; then
-            echo "::error ::Merge conflicts detected; aborting."
-            exit 1
+          if [ -s update.patch ]; then
+            if ! git apply --index --3way update.patch; then
+              echo "::error ::Merge conflicts detected; aborting." && exit 1
+            fi
+          else
+            echo "ℹ️ No template diffs; only SHA bump will occur."
           fi
 
-      # 11. Optional cleanup of temp directories
+      # 13. Clean up temp dirs
       - name: Cleanup temporary files
+        if: env.SHA_CHANGED == 'true'
         run: rm -rf base-template template-source template-base template-new update.patch
 
-      # 12. Optional: set Git author
+      # 14. Configure Git author
       - name: Configure Git author
+        if: env.SHA_CHANGED == 'true'
         run: |
-          git config user.name "GitHub Actions Bot"
+          git config user.name  "GitHub Actions Bot"
           git config user.email "actions@github.com"
 
-      # 13. Compute and export the new branch name
-      - name: Set update branch name
+      # 15. Create & checkout update branch
+      - name: Create update branch
+        if: env.SHA_CHANGED == 'true'
         id: make_branch
         run: |
-          echo "UPDATE_BRANCH=template-update-${{ steps.get_new_sha.outputs.new_sha }}" >> $GITHUB_ENV
+          UPDATE_BRANCH="template-update-${{ steps.get_new_sha.outputs.new_sha }}"
+          echo "UPDATE_BRANCH=${UPDATE_BRANCH}" >> $GITHUB_ENV
+          git checkout -b "${UPDATE_BRANCH}"
 
-      # 14. Create & checkout that branch
-      - name: Create update branch
-        run: git checkout -b $UPDATE_BRANCH
-
-      # 15. Bump template_sha in the JSON
+      # 16. Bump template_sha
       - name: Bump template_sha
+        if: env.SHA_CHANGED == 'true'
         run: |
           jq ".cookiecutter.template_sha = \"${{ steps.get_new_sha.outputs.new_sha }}\"" \
             .cookiecutter.json > tmp.json && mv tmp.json .cookiecutter.json
 
-      # 16. Commit the bump (only if changes)
-      - name: Commit changes
+      # 17. Commit & push changes
+      - name: Commit & push
+        if: env.SHA_CHANGED == 'true'
         run: |
           git add .cookiecutter.json
-          # only create a commit if the file actually changed
           git diff --cached --quiet || git commit -m "chore: bump template_sha to ${{ steps.get_new_sha.outputs.new_sha }}"
+          git push origin "${UPDATE_BRANCH}"
 
-      # 17. Push the update branch
-      - name: Push update branch
-        run: git push origin $UPDATE_BRANCH
-
-      # 18. Open a PR
+      # 18. Create Pull Request
       - name: Create Pull Request
+        if: env.SHA_CHANGED == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
-          token:     ${{ secrets.GITHUB_TOKEN }}
-          base:      ${{ inputs.repo_branch }}
-          branch:    ${{ env.UPDATE_BRANCH }}
-          title:     "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}"
-          body: |
+          base:   ${{ inputs.repo_branch }}
+          branch: ${{ env.UPDATE_BRANCH }}
+          title:  "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}"
+          body:   |
             This PR updates the cookiecutter template SHA:
             - old: ${{ steps.get_old_sha.outputs.old_sha }}
             - new: ${{ steps.get_new_sha.outputs.new_sha }}
