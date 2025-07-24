@@ -178,6 +178,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           base: ${{ inputs.repo_branch }} 
           branch: ${{ env.UPDATE_BRANCH }}
+          add-paths: .cookiecutter.json
           title:    "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}"
           body: |
             This PR updates the cookiecutter template SHA:
