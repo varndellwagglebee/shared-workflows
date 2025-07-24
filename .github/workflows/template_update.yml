@@ -52,6 +52,14 @@ jobs:
           NEW_SHA=$(git ls-remote "${{ inputs.template_repo }}" HEAD | cut -f1)
           echo "new_sha=$NEW_SHA" >> $GITHUB_OUTPUT
 
+      # 5. Exit early if unchanged
+      - name: Skip if template unchanged
+        run: |
+          if [ "${{ steps.get_old_sha.outputs.old_sha }}" = "${{ steps.get_new_sha.outputs.new_sha }}" ]; then
+            echo "Template SHA unchanged (${{ steps.get_old_sha.outputs.old_sha }}); exiting."
+            exit 0
+          fi
+
       - name: Clone base template at old SHA
         run: |
           git clone "${{ inputs.template_repo }}" base-template
@@ -79,12 +87,10 @@ jobs:
           else
             echo "::error ::No valid sub-template selected!" && exit 1
           fi
-      
-      - name: Clear Cookiecutter cache
-        run: rm -rf ~/.cookiecutters/*project.cookiecutter*
 
       - name: Generate base template output
         run: |
+          rm -rf ~/.cookiecutters/*project.cookiecutter*
           mkdir -p template-base
           cookiecutter "${{ inputs.template_repo }}" \
             --checkout HEAD \
@@ -93,11 +99,9 @@ jobs:
             --overwrite-if-exists \
             --output-dir template-base
 
-      - name: Clear Cookiecutter cache
-        run: rm -rf ~/.cookiecutters/*project.cookiecutter*
-
       - name: Generate new template output
         run: |
+          rm -rf ~/.cookiecutters/*project.cookiecutter*
           mkdir -p template-new
           cookiecutter "${{ inputs.template_repo }}" \
             --checkout HEAD \
@@ -125,12 +129,17 @@ jobs:
               exit 1
             fi
           fi
+          
+      # 11. Update the saved SHA in the nested object
+      - name: Update saved template SHA
+        if: steps.apply_patch.conclusion == 'success'
+        run: |
+          jq ".cookiecutter.template_sha = \"${{ steps.get_new_sha.outputs.new_sha }}\"" \
+            .cookiecutter.json > tmp.json && mv tmp.json .cookiecutter.json
+          git add .cookiecutter.json
 
-      - name: Cleanup
+      - name: Cleanup temporary files
         run: rm -rf base-template template-source template-base template-new update.patch
-
-      - name: Remove temporary context file
-        run: rm -f context.json
 
       - name: Configure Git author
         run: |
