@@ -176,12 +176,11 @@ jobs:
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          base: ${{ inputs.repo_branch }}
+          base: ${{ inputs.repo_branch }} 
           branch: ${{ env.UPDATE_BRANCH }}
-          title: "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}"
+          title:    "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}"
           body: |
-            This PR applies the cookiecutter template SHA update:
-            **old**: ${{ steps.get_old_sha.outputs.old_sha }}
-            **new**: ${{ steps.get_new_sha.outputs.new_sha }}
+            This PR updates the cookiecutter template SHA:
+            - old: ${{ steps.get_old_sha.outputs.old_sha }}
+            - new: ${{ steps.get_new_sha.outputs.new_sha }}
           labels: template-update
-          create-when-empty: true
