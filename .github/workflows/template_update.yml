@@ -180,7 +180,8 @@ jobs:
           branch: ${{ env.UPDATE_BRANCH }}
           title: "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}"
           body: |
-            Merges cookiecutter template updates from
-            ${{ steps.get_old_sha.outputs.old_sha }} to
-            ${{ steps.get_new_sha.outputs.new_sha }}.
+            This PR applies the cookiecutter template SHA update:
+            **old**: ${{ steps.get_old_sha.outputs.old_sha }}
+            **new**: ${{ steps.get_new_sha.outputs.new_sha }}
           labels: template-update
+          create-when-empty: true
