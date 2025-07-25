@@ -161,17 +161,15 @@ jobs:
           git push origin "${UPDATE_BRANCH}"
 
       # 11. Create Pull Request (even if only .cookiecutter.json changed)
-      - name: Create Pull Request
+       # After your commit & push step…
+      - name: Create Pull Request via GitHub CLI
         if: env.SHA_CHANGED == 'true'
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          base:   ${{ inputs.repo_branch }}
-          branch: ${{ env.UPDATE_BRANCH }}
-          add-paths: .cookiecutter.json
-          title:  "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}"
-          body: |
-            This PR updates the cookiecutter template SHA:
-            - old: ${{ steps.get_old_sha.outputs.old_sha }}
-            - new: ${{ steps.get_new_sha.outputs.new_sha }}
-          labels: template-update
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+          gh pr create \
+            --title "chore: merge template updates ${{ steps.get_old_sha.outputs.old_sha }} → ${{ steps.get_new_sha.outputs.new_sha }}" \
+            --body "Updates cookiecutter.template_sha from ${{ steps.get_old_sha.outputs.old_sha }} to ${{ steps.get_new_sha.outputs.new_sha }}" \
+            --base "${{ inputs.repo_branch }}" \
+            --head "${{ env.UPDATE_BRANCH }}"
